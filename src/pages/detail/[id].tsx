@@ -1,15 +1,19 @@
-import { wikiAtom } from "@/recoil/atoms/wikiData";
-import { IWiki, IWikiObjArr } from "@/types/iRctHookForm";
-import { Modal } from "antd";
+import { useRouter } from "next/router";
 import Image from "next/image";
-import Link from "next/link";
-import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
 import { useRecoilState, useRecoilValue } from "recoil";
+import { Modal } from "antd";
+import { IWiki, IWikiObjArr } from "@/types/iRctHookForm";
+import { wikiAtom } from "@/recoil/atoms/wikiData";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import Link from "next/link";
 
-// let IWikiData: IWikiObjArr | null = [];
-// let count = 0;
-export default function Home() {
+export default function Detail() {
+  const router = useRouter();
+  const pathId = router.asPath.split("/", 3);
+  const wikiId = Number(pathId[2]);
+  const wikiAtomPersist = useRecoilValue(wikiAtom);
+
   const {
     register,
     handleSubmit,
@@ -19,54 +23,63 @@ export default function Home() {
     getValues,
     formState: { errors },
   } = useForm<IWiki>();
-  const [isAddClick, setIsAddClick] = useState(false);
-  // const [recoilWikiAtom, setrecoilWikiAtom] = useState([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 5;
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const wikiAtomPersist = useRecoilValue(wikiAtom);
-
-  const [test, setTest] = useState<IWikiObjArr>();
-  const [dataCount, setDataCount] = useState<number>();
+  const [wikiObjData, setWikiObjData] = useState<IWiki>();
   const [recoilWikiAtom, setRecoilWikiAtom] =
     useRecoilState<IWikiObjArr>(wikiAtom);
+  const [isEditClick, setIsEditClick] = useState(false);
 
   useEffect(() => {
-    setDataCount(wikiAtomPersist.length);
-    setTest(wikiAtomPersist.slice(indexOfFirstItem, indexOfLastItem));
-  }, [recoilWikiAtom, currentPage]);
+    let singleData: IWiki | undefined = wikiAtomPersist.find(
+      (element) => element.id == wikiId
+    );
+    // console.log(singleData);
+
+    let newContent: string = [];
+
+    wikiAtomPersist?.map((item: IWiki) => {
+      const linkHtml = `<a href="/detail/${item.id}">${item.title}</a>`;
+      newContent = item.content.replace(item.title, linkHtml);
+      console.log(newContent, "new content");
+    });
+
+    //setWikiObjData(wikiAtomPersist.find((element) => element.id == wikiId));
+  }, [wikiId]);
+
+  useEffect(() => {
+    if (wikiObjData) {
+      setValue("title", wikiObjData.title);
+      setValue("content", wikiObjData.content);
+    }
+  }, [wikiObjData]);
 
   const showModal = () => {
-    setIsAddClick(true);
+    setIsEditClick(true);
   };
 
   const handleOk = () => {
-    setIsAddClick(false);
+    setIsEditClick(false);
   };
 
   const handleCancel = () => {
-    setIsAddClick(false);
+    setIsEditClick(false);
   };
-
   const onValid = (formData: IWiki) => {
-    console.log(formData, "form data");
-    setRecoilWikiAtom((prevData) => [
-      ...prevData,
-      { ...formData, id: prevData.length },
-    ]);
-    setIsAddClick(false);
-    reset();
+    let bakeWikiData: IWikiObjArr = [];
+    wikiAtomPersist.forEach((item) => {
+      if (item.id != wikiId) {
+        bakeWikiData.push(item);
+      }
+    });
+    console.log(bakeWikiData);
+
+    setRecoilWikiAtom(
+      [...bakeWikiData, { ...formData, id: wikiId }].sort((a, b) =>
+        a.id > b.id ? 1 : -1
+      )
+    );
+    setIsEditClick(false);
   };
   const onInvalid = (error: any) => {};
-
-  const handleNextPage = () => {
-    setCurrentPage((prevCurrentPage) => prevCurrentPage + 1);
-  };
-
-  const handlePrevPage = () => {
-    setCurrentPage((prevCurrentPage) => prevCurrentPage - 1);
-  };
 
   return (
     <div>
@@ -78,12 +91,17 @@ export default function Home() {
             </a>
           </Link>
         </div>
-        <button className="btn-post" onClick={showModal}>
-          추가
-        </button>
+
+        <div className="title">{wikiObjData?.title}</div>
+        <div className="content">{wikiObjData?.content}</div>
+        <div className="btn-wrap">
+          <button type="submit" className="btn-post" onClick={showModal}>
+            수정
+          </button>
+        </div>
         <Modal
-          title="위키 등록"
-          open={isAddClick}
+          title="위키 수정"
+          open={isEditClick}
           onOk={handleOk}
           onCancel={handleCancel}
           width={500}
@@ -143,31 +161,6 @@ export default function Home() {
             </div>
           </form>
         </Modal>
-
-        <div className="wiki-items-wrap">
-          <button
-            className="btn-page"
-            onClick={handlePrevPage}
-            disabled={currentPage === 1}
-          >
-            &lt;
-          </button>
-          <div className="link-title">
-            {test?.map((item: IWiki, i: number) => (
-              <Link href={`/detail/${item?.id}`} legacyBehavior key={i}>
-                <a className="logo-content">{item?.title}</a>
-              </Link>
-            ))}
-          </div>
-          <button
-            className="btn-page"
-            onClick={handleNextPage}
-            disabled={dataCount ? indexOfLastItem >= dataCount : true}
-          >
-            &gt;
-          </button>
-        </div>
-        <span>Total : {dataCount} 개</span>
       </div>
       <style jsx>{`
         .main {
@@ -218,6 +211,7 @@ export default function Home() {
           justify-content: center;
           text-align: center;
         }
+
         .form-input:focus,
         .text-area:focus {
           outline: none;
