@@ -13,7 +13,10 @@ export default function Detail() {
   const pathId = router.asPath.split("/", 3);
   const wikiId = Number(pathId[2]);
   const wikiAtomPersist = useRecoilValue(wikiAtom);
-
+  let titleFoundArry: any = [];
+  let singleData: any;
+  const [singleWikiData, setSingleWikiData] = useState<any>();
+  const [allTitle, setAllTitle] = useState<string[]>();
   const {
     register,
     handleSubmit,
@@ -23,34 +26,65 @@ export default function Detail() {
     getValues,
     formState: { errors },
   } = useForm<IWiki>();
-  const [wikiObjData, setWikiObjData] = useState<IWiki>();
+  const [wikiObjData, setWikiObjData] = useState<any>();
   const [recoilWikiAtom, setRecoilWikiAtom] =
     useRecoilState<IWikiObjArr>(wikiAtom);
   const [isEditClick, setIsEditClick] = useState(false);
 
   useEffect(() => {
-    let singleData: IWiki | undefined = wikiAtomPersist.find(
-      (element) => element.id == wikiId
-    );
-    // console.log(singleData);
+    singleData = wikiAtomPersist.find((element) => element.id == wikiId);
+    setSingleWikiData(singleData);
+    let changeIntoLink: string[] = [];
 
-    let newContent: string = [];
-
-    wikiAtomPersist?.map((item: IWiki) => {
-      const linkHtml = `<a href="/detail/${item.id}">${item.title}</a>`;
-      newContent = item.content.replace(item.title, linkHtml);
-      console.log(newContent, "new content");
+    wikiAtomPersist.map((item) => {
+      const titleWords = item.title.split(/\s+/); // Split the title into words
+      const matchedWord = singleData?.content
+        .split(/\s+/)
+        .find((word: string) => {
+          // Check if the word matches any of the words in the title
+          return titleWords.includes(word);
+        });
+      if (matchedWord != null) {
+        titleFoundArry.push({
+          title: matchedWord,
+          id: item.id,
+          content: item.content,
+        });
+      }
     });
 
-    //setWikiObjData(wikiAtomPersist.find((element) => element.id == wikiId));
-  }, [wikiId]);
+    setAllTitle(titleFoundArry);
+
+    titleFoundArry?.map((item: IWiki) => {
+      const linkHtml = `<a href="/detail/${item.id}">${item.title}</a>`;
+      changeIntoLink.push(item.title.replace(item.title, linkHtml));
+    });
+
+    const pattern = new RegExp(
+      titleFoundArry.map((item: { title: any }) => item.title).join("|"),
+      "g"
+    );
+
+    // Replace the matched titles with the links
+    const replaceIntoTitle = singleData?.content.replace(
+      pattern,
+      (match: any) => {
+        const index = titleFoundArry.findIndex(
+          (item: { title: string }) => item.title === match
+        );
+        return changeIntoLink[index];
+      }
+    );
+
+    setWikiObjData({ title: singleData?.title, content: replaceIntoTitle });
+  }, [wikiId, wikiAtomPersist]);
 
   useEffect(() => {
     if (wikiObjData) {
       setValue("title", wikiObjData.title);
-      setValue("content", wikiObjData.content);
+      setValue("content", singleWikiData?.content);
     }
-  }, [wikiObjData]);
+  }, [wikiObjData, singleWikiData]);
 
   const showModal = () => {
     setIsEditClick(true);
@@ -70,7 +104,6 @@ export default function Detail() {
         bakeWikiData.push(item);
       }
     });
-    console.log(bakeWikiData);
 
     setRecoilWikiAtom(
       [...bakeWikiData, { ...formData, id: wikiId }].sort((a, b) =>
@@ -91,13 +124,34 @@ export default function Detail() {
             </a>
           </Link>
         </div>
+        <div className="content-wrap">
+          <h2 className="title">{wikiObjData?.title}</h2>
 
-        <div className="title">{wikiObjData?.title}</div>
-        <div className="content">{wikiObjData?.content}</div>
+          {allTitle && allTitle?.length > 0 ? (
+            <div
+              className="content"
+              dangerouslySetInnerHTML={
+                wikiObjData
+                  ? { __html: wikiObjData?.content }
+                  : { __html: "nothing" }
+              }
+            ></div>
+          ) : (
+            <div className="content">{singleWikiData?.content}</div>
+          )}
+        </div>
         <div className="btn-wrap">
           <button type="submit" className="btn-post" onClick={showModal}>
-            수정
+            편집
           </button>
+        </div>
+        <div className="title-tag-wrap">
+          <div className="title-tag"># {wikiObjData?.title}</div>
+          <div className="title-tag">
+            {allTitle?.map((item: any, i: number) => (
+              <div key={i}># {item.title}</div>
+            ))}
+          </div>
         </div>
         <Modal
           title="위키 수정"
@@ -113,26 +167,16 @@ export default function Detail() {
               <div className="title-wrap">
                 <div>Title</div>
                 <input
+                  disabled={true}
                   type="text"
                   autoComplete="off"
-                  {...register("title", {
-                    required: "제목을 입력해주세요",
-                    minLength: {
-                      message: "최소 3자 이상 입력해 주세요.",
-                      value: 3,
-                    },
-                    maxLength: {
-                      message: "최대 글자 수는 10자(공백 포함) 입니다.",
-                      value: 10,
-                    },
-                  })}
+                  {...register("title", {})}
                   className="form-input"
                   placeholder="Title"
                 />
-                <div className="error-msg">{errors?.title?.message}</div>
               </div>
 
-              <div className="content-wrap">
+              <div>
                 <div>Content</div>
                 <textarea
                   maxLength={500}
@@ -189,7 +233,19 @@ export default function Detail() {
           width: 100%;
         }
         .content-wrap {
-          width: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          width: auto;
+          max-width: 400px;
+          padding: 20px;
+          border-radius: 10px;
+          background: #b9dffc;
+        }
+        .content {
+          width: auto;
+          white-space: pre-wrap;
         }
         .form-input {
           width: 100%;
@@ -262,6 +318,15 @@ export default function Detail() {
           background: none;
           border: none;
           font-size: 30px;
+        }
+        .title-tag {
+          display: flex;
+          gap: 10px;
+        }
+        .title-tag-wrap {
+          display: flex;
+          gap: 10px;
+          margin-top: 50px;
         }
       `}</style>
     </div>

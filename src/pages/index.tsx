@@ -50,7 +50,6 @@ export default function Home() {
   };
 
   const onValid = (formData: IWiki) => {
-    console.log(formData, "form data");
     setRecoilWikiAtom((prevData) => [
       ...prevData,
       { ...formData, id: prevData.length },
@@ -104,8 +103,18 @@ export default function Home() {
                       value: 3,
                     },
                     maxLength: {
-                      message: "최대 글자 수는 10자(공백 포함) 입니다.",
+                      message: "최대 글자 수는 10자 입니다.",
                       value: 10,
+                    },
+                    validate: {
+                      noSpace: (value) =>
+                        !value.includes(" ") || "공백 없이 입력해 주세요.",
+                      duplicate: (value) =>
+                        (Array.isArray(wikiAtomPersist) &&
+                          !wikiAtomPersist.find(
+                            (element) => element.title === value
+                          )) ||
+                        "이미 등록된 위키 정보 입니다.",
                     },
                   })}
                   className="form-input"
